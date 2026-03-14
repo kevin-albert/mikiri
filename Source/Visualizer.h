@@ -7,50 +7,61 @@
 
 
 // needs to be odd
-constexpr int shapeSize = 7;
+constexpr int shapeSize = 11;
 const int SHAPES[][shapeSize][shapeSize] = {
 {   // sine
 
-    {0,0,1,1,1,0,0},
-    {0,1,1,1,1,1,0},
-    {1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1},
-    {0,1,1,1,1,1,0},
-    {0,0,1,1,1,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,1,1,1,1,1,0,0,0},
+    {0,0,1,1,1,1,1,1,1,0,0},
+    {0,1,1,1,1,1,1,1,1,1,0},
+    {0,1,1,1,1,1,1,1,1,1,0},
+    {0,1,1,1,1,1,1,1,1,1,0},
+    {0,1,1,1,1,1,1,1,1,1,0},
+    {0,1,1,1,1,1,1,1,1,1,0},
+    {0,0,1,1,1,1,1,1,1,0,0},
+    {0,0,0,1,1,1,1,1,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0},
 
 },
 {   // tri
-
-    {0,0,0,1,0,0,0},
-    {0,0,1,1,1,0,0},
-    {0,1,1,1,1,1,0},
-    {1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1},
-    {0,0,0,0,0,0,0},
-
+    {0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,1,0,0,0,0,0},
+    {0,0,0,0,1,1,1,0,0,0,0},
+    {0,0,0,1,1,1,1,1,0,0,0},
+    {0,0,1,1,1,1,1,1,1,0,0},
+    {0,1,1,1,1,1,1,1,1,1,0},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0},
 },
 {   // saw
-
-    {1,1,1,1,1,1,1},
-    {0,1,1,1,1,1,1},
-    {0,0,1,1,1,1,1},
-    {0,0,0,1,1,1,1},
-    {0,0,0,0,1,1,1},
-    {0,0,0,0,0,1,1},
-    {0,0,0,0,0,0,1},
-
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {0,1,1,1,1,1,1,1,1,1,1},
+    {0,0,1,1,1,1,1,1,1,1,1},
+    {0,0,0,1,1,1,1,1,1,1,1},
+    {0,0,0,0,1,1,1,1,1,1,1},
+    {0,0,0,0,0,1,1,1,1,1,1},
+    {0,0,0,0,0,0,1,1,1,1,1},
+    {0,0,0,0,0,0,0,1,1,1,1},
+    {0,0,0,0,0,0,0,0,1,1,1},
+    {0,0,0,0,0,0,0,0,0,1,1},
+    {0,0,0,0,0,0,0,0,0,0,1},
 },
 {   // square
-
-    {1,1,1,1,1,1,1},
-    {1,1,0,0,0,1,1},
-    {1,1,0,0,0,1,1},
-    {1,1,0,0,0,1,1},
-    {1,1,0,0,0,1,1},
-    {1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,0,0,0,0,1,1,1,1},
+    {1,1,1,0,0,0,0,1,1,1,1},
+    {1,1,1,0,0,0,0,1,1,1,1},
+    {1,1,1,0,0,0,0,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1},
 },
 };
 
@@ -65,15 +76,33 @@ const juce::PixelARGB COLORS[numColors] = {
     juce::PixelARGB(0xff, 0xff, 0x00, 0xff)  // violet
 };
 
+class Random {
+    public:
+        static inline float next(const float min = 0.0f, const float max = 1.0f) {
+            return distr(eng) * (max-min) + min;
+        }
+    private:
+        static std::mt19937 eng;
+        static std::uniform_real_distribution<float> distr;
+};
+
 class Particle
 {
     public:
-        Particle(juce::PixelARGB col, const int shapeId, float bright, float decay):
+        Particle(juce::PixelARGB col, 
+                 const int shapeId,
+                 const float bright,
+                 float decay,
+                 const float shimmer,
+                 const int tailLength):
             color(col),
             shape(shapeId),
             brightness(bright),
-            decayFac(decay)
-        {}
+            decayFac(decay),
+            shimmerAmount(shimmer),
+            maxTail(tailLength)
+        {
+        }
 
         inline bool visible(const int width, const int height) const {
             return pos[0] >= 0.0f && pos[0] < static_cast<float>(width) && 
@@ -84,34 +113,36 @@ class Particle
         int shape;
         float brightness;
         float decayFac;
+        float shimmerAmount;
 
         //                 x,    y
         float pos[2] = {0.0f, 0.0f};
         float vel[2] = {0.0f, 0.0f};
+        static constexpr float jitter = 2.0f;
         
-        static constexpr int maxTail = 3;
+        int maxTail;
         int tailPos = 0;
         int tailLength = 0;
-        float tail[maxTail][2] = {{0}};
+        float tail[20][2];
 
-        static constexpr int pixelate = 3;
+        static constexpr int pixelate = 2;
 
         inline void step(const float timestep) {
             for (size_t i = 0; i < 2; ++i) {
                 pos[i] += vel[i] * timestep;
             }
-            vel[1] -= 0.05f;
-            brightness *= decayFac * timestep;
+            vel[1] += 0.05f;
+            // brightness *= decayFac * timestep;
         }
 
         inline int quantize(int a) {
             return (a/pixelate) * pixelate;
         }
 
-        inline void draw(juce::Image::BitmapData& bmp, const float xJitter, const float yJitter) {
+        inline void draw(juce::Image::BitmapData& bmp) {
             // add tail ringBuffer with jitter
-            tail[tailPos][0] = pos[0] + xJitter;
-            tail[tailPos][1] = pos[1] + yJitter;
+            tail[tailPos][0] = pos[0] + Random::next(-jitter, jitter);
+            tail[tailPos][1] = pos[1] + Random::next(-jitter, jitter);
             if (tailLength < maxTail)
                 ++tailLength;
             tailPos = (tailPos+1) % maxTail;
@@ -132,6 +163,8 @@ class Particle
                 const int startX = quantize(centerX - shapeOffset), 
                           startY = quantize(centerY - shapeOffset);
                 auto& shapeData = SHAPES[shape];
+
+                const bool shimmer = shimmerAmount > 0.02f && Random::next() < shimmerAmount;
 
                 // paint over the quantized canvas area in chunks with stride=pixelate
                 for (int y = startY; y < startY + shapeSize+pixelate-1; y += pixelate) {
@@ -163,7 +196,9 @@ class Particle
                             continue;
                         }
 
-                        const int alpha = 0x100;
+                        const float alpha = brightness * static_cast<float>(maxTail-i)/static_cast<float>(maxTail);
+                        const int alphaInt = static_cast<int>(256.0f * alpha);
+
                         // apply the color
                         for (int y_ = y; y_ < y+pixelate; ++y_) {
                             if (y_ < 0)
@@ -176,44 +211,17 @@ class Particle
                                     continue;
                                 if (x_ >= bmp.width)
                                     break;
-                                
-                                row[x_].blend(color, alpha);
+
+
+                                if (shimmer) {
+                                    row[x_].blend(juce::PixelARGB(0xff, 0xff, 0xff, 0xff), alphaInt);
+                                } else {
+                                    row[x_].blend(color, alphaInt);
+                                }
                             }
                         }
                     }
                 }
-                
-
-                /*
-                auto& shapeData = SHAPES[shape];
-
-                constexpr int shapeOffset = shapeSize/2;
-                for (int shapeY = -shapeOffset; shapeY <= shapeOffset; ++shapeY) {
-                    int y = centerY + shapeY;
-                    if (y < 0 || y >= bmp.height)
-                        continue;
-
-                    auto* row = reinterpret_cast<juce::PixelARGB*>(bmp.getLinePointer(y));
-                    for (int shapeX = -shapeOffset; shapeX <= shapeOffset; ++shapeX) {
-                        int x = centerX + shapeX;
-                        if (x < 0 || x >= bmp.width)
-                            continue;
-
-                        // tail particles linear decay
-                        int alpha = (0x100 * (maxTail-i)) / maxTail;
-
-                        // apply fadeIn
-                        // if (tailLength == 1)
-                        //     alpha /= 2;
-
-                        if (shapeData[quantize(shapeY+shapeOffset)][quantize(shapeX+shapeOffset)]) {
-                            // row[x].set(color);
-                            row[x].blend(color, alpha);
-                            // uint8_t alpha = static_cast<uint8_t>(255.0f * particle->brightness); 
-                            // row[x].set(juce::PixelARGB(0xff, 0xff, 0xff, 0xff));
-                        }
-                    }
-                }*/
             }
         }
 
@@ -236,16 +244,7 @@ private:
 
     static constexpr int width = 680;
     static constexpr int height = 300;
-    static constexpr int pixelate = 2;
     juce::Image imageBuffer;
-
-    std::mt19937 eng;
-    std::uniform_real_distribution<float> distr;
-    inline float nextRandom(const float min = 0.0f, const float max = 1.0f) {
-        return distr(eng) * (max-min) + min;
-    }
-
-    static constexpr float particleJitter = 4.0f;
 
     std::deque<float> recentFrequencies;
 

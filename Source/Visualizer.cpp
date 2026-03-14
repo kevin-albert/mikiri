@@ -1,12 +1,13 @@
 #include "Visualizer.h"
 #include <algorithm>
 
+std::mt19937 Random::eng;
+std::uniform_real_distribution<float> Random::distr(0.0f, 1.0f);
 
 Visualizer::Visualizer(const int rate):
     frameRate(rate),
     timestep(speed / static_cast<float>(frameRate)),
-    imageBuffer(juce::Image::ARGB, 680, 300, true),
-    distr(0.0f, 1.0f)
+    imageBuffer(juce::Image::ARGB, 680, 300, true)
 {
 }
 
@@ -33,16 +34,16 @@ void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
         for (const auto& step: steps) {
             for (const auto& tone: step.tones) {
                 // only add particle if above a certain loudness
-                if (tone.magnitude < 0.01)
+                if (tone.magnitude < 0.001)
                     continue;
 
                 float yFactor;
                 if (pitchDelta > 0.1f) {
                     float pitch = frequencyToPitch(tone.frequency);
-                    yFactor = (pitch - minPitch) / pitchDelta;
-                    yFactor += nextRandom(-0.1, 0.1);
+                    yFactor = 1.0f - (pitch - minPitch) / pitchDelta;
+                    yFactor += Random::next(-0.1, 0.1);
                 } else {
-                    yFactor = nextRandom();
+                    yFactor = Random::next();
                 }
 
                 int colorId = static_cast<int>(static_cast<float>(numColors) * yFactor);
@@ -50,14 +51,18 @@ void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
                 else if (colorId >= numColors) colorId = numColors-1;
 
                 constexpr float yMin = 150.0;
-                constexpr float yMax = 220.0;
+                constexpr float yMax = 240.0;
                 float y = yMin + yFactor * (yMax-yMin);
-                float x = 170.0f;
-                Particle* p = new Particle(COLORS[colorId], step.shape, 1.0f, 0.9f);
+                float x = 150.0f;
+                const float shimmerAmount = 0.3f * step.tone / 16000.0f;
+                const int tailLength = static_cast<int>(2.0f + 12.0f * step.blur);
+
+                const float brightness = std::min(0.5f + 1.0f * tone.magnitude, 1.0f);
+                Particle* p = new Particle(COLORS[colorId], step.shape, brightness, 0.9f, shimmerAmount, tailLength);
                 p->pos[0] = x;
                 p->pos[1] = y;
-                p->vel[0] = nextRandom(100.0f, 110.0f);
-                p->vel[1] = nextRandom(-6.0f, 5.0f);
+                p->vel[0] = Random::next(100.0f, + 300.0f * static_cast<float>(step.envelope));
+                p->vel[1] = Random::next(-6.0f, -5.0f);
                 addParticle(p);
             }
         }
@@ -76,8 +81,6 @@ void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
     // draw particles
     for (Particle* particle: particles) {
         ++dbg;
-        particle->draw(bmp, 
-                       nextRandom(-particleJitter, particleJitter), 
-                       nextRandom(-particleJitter, particleJitter));
+        particle->draw(bmp);
     }
 }

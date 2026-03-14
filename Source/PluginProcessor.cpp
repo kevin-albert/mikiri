@@ -249,13 +249,17 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     arp2.setTarget(pitches, magScale, 1);
     const int waveType = static_cast<int>(shapeParam->load());
 
+    float toneValue = toneParam->load();
+    toneValue *= 1.0f + 4.0f * envelope;
+    toneValue = std::min(toneValue, 16000.0f);
+
     if (stepped) {
         // add notes to the visualizer
         VizStep step;
         step.mix = mixParam->load();
         step.blur = blurParam->load();
         step.envelope = envelope;
-        step.tone = toneParam->load();
+        step.tone = toneValue;
         step.depth = depthParam->load();
         step.shape = waveType;
 
@@ -328,10 +332,6 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             synthR[i] = applyClipping(synthR[i]);
     }
 
-
-    float toneValue = toneParam->load();
-    toneValue *= 1.0f + 4.0f * envelope;
-    toneValue = std::min(toneValue, 16000.0f);
     synthLowpass.setCutoffFrequency(toneValue);
     juce::dsp::AudioBlock<float> synthBlock(synthBuffer);
     juce::dsp::ProcessContextReplacing<float> synthContext(synthBlock);
