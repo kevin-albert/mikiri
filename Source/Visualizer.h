@@ -33,14 +33,14 @@ class Particle
     public:
         Particle(juce::PixelARGB col, 
                  const int shapeId,
-                 const float bright,
-                 float decay,
+                 const float stepsPerSecond,
+                 const float oscillationAmount,
                  const float shimmer,
                  const int tailLength):
             color(col),
             shape(shapeId),
-            brightness(bright),
-            decayFac(decay),
+            stepRate(stepsPerSecond),
+            oscillation(oscillationAmount),
             shimmerAmount(shimmer),
             maxTail(tailLength)
         {
@@ -53,15 +53,20 @@ class Particle
 
         juce::PixelARGB color;
         int shape;
-        float brightness;
-        float decayFac;
+        float stepRate;
+        float stepPeriod = 0.0f;
+        float yOffset;
+
         float shimmerAmount;
 
         //                 x,    y
         float pos[2] = {0.0f, 0.0f};
         float vel[2] = {0.0f, 0.0f};
-        static constexpr float jitter = 2.0f;
+        static constexpr float drag = 0.03f;
+        static constexpr float gravity = 17.0f;
+        static constexpr float jitter = 0.0f;
         
+        float oscillation = 0.0f;
         int maxTail;
         int tailPos = 0;
         int tailLength = 0;
@@ -73,8 +78,49 @@ class Particle
             for (size_t i = 0; i < 2; ++i) {
                 pos[i] += vel[i] * timestep;
             }
-            vel[1] += 2.0f;
-            // brightness *= decayFac * timestep;
+
+            // compute yOffset based on waveform & arp rate
+            if (shape == 1) // triangle - double rate
+                stepPeriod += 2.0f * stepRate * timestep;
+            else
+                stepPeriod += stepRate * timestep;
+
+            while (stepPeriod > 4.0f)
+                stepPeriod -= 4.0f;
+
+            switch (shape) {
+                case 0: // sine
+                    yOffset = std::tanh(std::sin(stepPeriod * juce::MathConstants<float>::halfPi));
+                    break;
+                case 1: // triangle
+                    if (stepPeriod < 1.0f)
+                        yOffset = stepPeriod;
+                    else if (stepPeriod < 3.0f)
+                        yOffset = 2.0f - stepPeriod;
+                    else
+                        yOffset = stepPeriod - 4.0f;
+                    break;
+                case 2: // saw
+                    if (stepPeriod < 2.0f)
+                        yOffset = 1.0f - stepPeriod;
+                    else
+                        yOffset = 3.0f - stepPeriod;
+                    break;
+                case 3: // square
+                    if (stepPeriod < 2.0f)
+                        yOffset = 1.0f;
+                    else
+                        yOffset = -1.0f;
+                    break;
+                default:
+                    yOffset = 0.0f;
+            }
+
+            // apply additional physics outside of the mouth only
+            if (pos[0] > 220.0f) {
+                vel[0] *= (1.0f-drag);
+                vel[1] += gravity;
+            }
         }
 
         inline int quantize(int a) {
@@ -82,9 +128,14 @@ class Particle
         }
 
         inline void draw(juce::Image::BitmapData& bmp) {
-            // add tail ringBuffer with jitter
-            tail[tailPos][0] = pos[0] + Random::next(-jitter, jitter);
-            tail[tailPos][1] = pos[1] + Random::next(-jitter, jitter);
+
+            const float spd = std::sqrt(vel[0]*vel[0] + vel[1]+vel[1]);
+            float dir[] = {vel[0]/spd, vel[1]/spd};
+
+            // add tail ringBuffer with oscillation
+            // oscillate along the tangent (+/- normal)
+            tail[tailPos][0] = pos[0] + 15.0f * dir[1] * oscillation * -yOffset;
+            tail[tailPos][1] = pos[1] + 15.0f * dir[0] * oscillation * yOffset;
             if (tailLength < maxTail)
                 ++tailLength;
             tailPos = (tailPos+1) % maxTail;
@@ -128,7 +179,7 @@ class Particle
                                     continue;
                                 else if (localX >= Shapes::size)
                                     break;
-                                sum += Shapes::get(shape, localY, localX);
+                                sum += Shapes::get(0, localY, localX);
                             }
                         }
 
@@ -137,10 +188,13 @@ class Particle
                             continue;
                         }
 
-                        const float alpha = brightness * static_cast<float>(maxTail-i)/static_cast<float>(maxTail);
+                        const float alpha = static_cast<float>(maxTail-i)/static_cast<float>(maxTail);
                         
                         const bool pixelBlink = shimmer && Random::next() > 0.8f;
-                        const int alphaInt = pixelBlink ? 256 : static_cast<int>(256.0f * alpha);
+                        int alphaInt = pixelBlink ? 256 : static_cast<int>(256.0f * alpha);
+                        if ((pos[0] > 650 && pos[1] > 225) ||
+                            (pos[0] > 505 && pos[1] > 260))
+                                alphaInt /= 8;
                         const juce::PixelARGB pixelColor = pixelBlink ? juce::PixelARGB(0xff, 0xff, 0xff, 0xff) : color; 
 
                         // apply the color
@@ -157,12 +211,6 @@ class Particle
                                     break;
 
                                 row[x_].blend(pixelColor, alphaInt);
-
-                                // if (shimmer && Random::next() > 0.9f) {
-                                //     row[x_].blend(juce::PixelARGB(0xff, 0xff, 0xff, 0xff), alphaInt);
-                                // } else {
-                                //     row[x_].blend(color, alphaInt);
-                                // }
                             }
                         }
                     }
@@ -180,10 +228,10 @@ public:
     Visualizer(const int rate);
     void step(const std::vector<PluginProcessor::VizStep>& steps);
     juce::Image getBuffer() { return imageBuffer; }
-    int dbg;
+    float dbg;
 
 private:
-    static constexpr float speed = 5.0f;
+    static constexpr float speed = 0.7f;
     const int frameRate;
     const float timestep;
 
@@ -206,7 +254,7 @@ private:
     inline float frequencyToPitch(float frequency) {
         return std::log2(frequency);
     }
-    
+
     static constexpr size_t maxRecentPitches = 40;
     std::deque<float> recentPitches;
     inline void addRecentPitch(const float frequency) {

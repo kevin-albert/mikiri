@@ -37,7 +37,7 @@ namespace
         params.push_back(std::make_unique<juce::AudioParameterFloat>(
             juce::ParameterID("input", 1),
             "input",
-            juce::NormalisableRange<float>(0.0f, 24.0f, 0.1f),
+            juce::NormalisableRange<float>(0.0f, 40.0f, 0.1f),
             0.0f,
             juce::AudioParameterFloatAttributes().withLabel("dB")));
 
@@ -265,6 +265,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
         step.tone = toneValue;
         step.depth = depthParam->load();
         step.shape = waveType;
+        step.stepsPerSecond = static_cast<float>((bpm * stepsPerBeat) / 60.0);
 
         auto pitch1 = arp1.getPitch();
         auto pitch2 = arp2.getPitch();
@@ -336,17 +337,16 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     }
 
     const float depth = depthParam->load();
-    const float half_pi = static_cast<float>(M_PI_2);
     const float depthx3 = 3.0f * depth;
     float shift1Amount = 0.0f;
     float shift2Amount = 0.0f;
     float shift3Amount = 0.0f;
     if (depthx3 >= 2.0f)
-        shift1Amount = std::sin((depthx3-2.0f) * half_pi);
+        shift1Amount = std::sin((depthx3-2.0f) * juce::MathConstants<float>::halfPi);
     if (depthx3 >= 1.0f)
-        shift2Amount = std::sin((depthx3-1.0f) * half_pi);
+        shift2Amount = std::sin((depthx3-1.0f) * juce::MathConstants<float>::halfPi);
     if (depthx3 <= 1.5f)
-        shift3Amount = std::sin((depthx3+0.5f) * half_pi);
+        shift3Amount = std::sin((depthx3+0.5f) * juce::MathConstants<float>::halfPi);
 
     // pitch shifter
     juce::AudioBuffer<float> shiftBuffer(numChannels, numSamples);
@@ -363,7 +363,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     shift3.process(buffer, shiftBuffer, feedback, shift3Amount * envelope);
 
     // combine shift + synth buffer before further processing
-    const float shiftMix = 0.03f + depth * 0.04f;
+    const float shiftMix = 0.02f + depth * 0.03f;
     for (int ch = 0; ch < numChannels; ++ch)
         synthBuffer.addFrom(ch, 0, shiftBuffer, ch, 0, numSamples, shiftMix);
 

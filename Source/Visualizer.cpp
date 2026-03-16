@@ -27,6 +27,8 @@ void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
         }
     }
 
+    dbg = 0.0f;
+
     if (!recentPitches.empty()) {
         const float minPitch = *(std::min_element(recentPitches.begin(), recentPitches.end()));
         const float maxPitch = *(std::max_element(recentPitches.begin(), recentPitches.end()));
@@ -51,19 +53,26 @@ void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
                 if (colorId < 0) colorId = 0;
                 else if (colorId >= numColors) colorId = numColors-1;
 
-                constexpr float yMin = 150.0;
-                constexpr float yMax = 240.0;
+                constexpr float yMin = 150.0f + 20.0f;
+                constexpr float yMax = 240.0f + 5.0f;
                 float y = yMin + yFactor * (yMax-yMin);
                 float x = 150.0f;
                 const float shimmerAmount = 0.3f * step.tone / 16000.0f;
-                const int tailLength = static_cast<int>(2.0f + 6.0f * step.blur);
 
-                Particle* p = new Particle(COLORS[colorId], step.shape, 1.0f, 0.9f, shimmerAmount, tailLength);
+                const int tailLength = static_cast<int>(4.0f + 6.0f * step.blur + 4.0f * step.envelope);
+
+                Particle* p = new Particle(COLORS[colorId], step.shape, step.stepsPerSecond, step.mix, shimmerAmount, tailLength);
                 p->pos[0] = x;
                 p->pos[1] = y;
-                p->vel[0] = Random::next(100.0f, + 300.0f * static_cast<float>(step.envelope));
-                p->vel[1] = Random::next(-6.0f, -5.0f);
+
+                const float velocityAdjust = std::max(0.0f, 2.0f * step.envelope - 1.0f);
+
+                // higher up particles start with higher velocity
+                p->vel[0] = 180.0f + (1.0f - yFactor) * 80.0f + 800.0f * velocityAdjust;
+                p->vel[1] = -60.0f - 40.0f * velocityAdjust;
                 addParticle(p);
+
+                dbg = step.stepsPerSecond;
             }
         }
     }
@@ -77,10 +86,8 @@ void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
             row[x].set(juce::PixelARGB(0x00, 0x00, 0x00, 0x00));
     }
 
-    dbg = 0;
     // draw particles
     for (Particle* particle: particles) {
-        ++dbg;
         particle->draw(bmp);
     }
 }

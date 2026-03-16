@@ -23,6 +23,7 @@ public:
         float tone;
         float depth;
         int shape;
+        float stepsPerSecond;
     };
 
     class Shifter 

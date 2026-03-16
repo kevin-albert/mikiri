@@ -100,7 +100,7 @@ private:
     juce::Image vizBuffer;
     ForegroundOverlay fgOverlay;
 
-    static constexpr int refreshRate = 10;
+    static constexpr int refreshRate = 20;
 
     std::vector<PluginProcessor::VizStep> steps;
     Visualizer viz;

@@ -95,7 +95,7 @@ PluginEditor::PluginEditor(PluginProcessor& processor)
     debugLabel.setFont(juce::Font("Courier New", 12.0f, juce::Font::plain));
     debugLabel.setColour(juce::Label::textColourId, juce::Colours::white);
     debugLabel.setJustificationType(juce::Justification::bottomLeft);
-    addAndMakeVisible(debugLabel);
+    // addAndMakeVisible(debugLabel);
 
     setSize(680, 300);
     startTimerHz(refreshRate);
@@ -122,10 +122,10 @@ void PluginEditor::resized()
 {
     constexpr int knobSize = 30;
     constexpr int rateKnobSize = 75;
-    constexpr int gap = 30;
+    constexpr int gap = 20;
     constexpr int numSmall = 6;
     constexpr int totalWidth = knobSize * numSmall + rateKnobSize + gap * 6;
-    constexpr int offsetX = 200;
+    constexpr int offsetX = 260;
     const int outerWidth = getWidth() - offsetX;
     int startX = offsetX + (outerWidth - totalWidth) / 2;
     constexpr int topY = 20;
