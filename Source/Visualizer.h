@@ -1,69 +1,11 @@
 #pragma once
 
+#include "Shapes.h"
 #include "PluginProcessor.h"
 #include <juce_graphics/juce_graphics.h>
 #include <vector>
 #include <random>
 
-
-// needs to be odd
-constexpr int shapeSize = 11;
-const int SHAPES[][shapeSize][shapeSize] = {
-{   // sine
-
-    {0,0,0,0,0,0,0,0,0,0,0},
-    {0,0,0,1,1,1,1,1,0,0,0},
-    {0,0,1,1,1,1,1,1,1,0,0},
-    {0,1,1,1,1,1,1,1,1,1,0},
-    {0,1,1,1,1,1,1,1,1,1,0},
-    {0,1,1,1,1,1,1,1,1,1,0},
-    {0,1,1,1,1,1,1,1,1,1,0},
-    {0,1,1,1,1,1,1,1,1,1,0},
-    {0,0,1,1,1,1,1,1,1,0,0},
-    {0,0,0,1,1,1,1,1,0,0,0},
-    {0,0,0,0,0,0,0,0,0,0,0},
-
-},
-{   // tri
-    {0,0,0,0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,1,0,0,0,0,0},
-    {0,0,0,0,1,1,1,0,0,0,0},
-    {0,0,0,1,1,1,1,1,0,0,0},
-    {0,0,1,1,1,1,1,1,1,0,0},
-    {0,1,1,1,1,1,1,1,1,1,0},
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {0,0,0,0,0,0,0,0,0,0,0},
-    {0,0,0,0,0,0,0,0,0,0,0},
-},
-{   // saw
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {0,1,1,1,1,1,1,1,1,1,1},
-    {0,0,1,1,1,1,1,1,1,1,1},
-    {0,0,0,1,1,1,1,1,1,1,1},
-    {0,0,0,0,1,1,1,1,1,1,1},
-    {0,0,0,0,0,1,1,1,1,1,1},
-    {0,0,0,0,0,0,1,1,1,1,1},
-    {0,0,0,0,0,0,0,1,1,1,1},
-    {0,0,0,0,0,0,0,0,1,1,1},
-    {0,0,0,0,0,0,0,0,0,1,1},
-    {0,0,0,0,0,0,0,0,0,0,1},
-},
-{   // square
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,0,0,0,0,1,1,1,1},
-    {1,1,1,0,0,0,0,1,1,1,1},
-    {1,1,1,0,0,0,0,1,1,1,1},
-    {1,1,1,0,0,0,0,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1},
-},
-};
 
 constexpr int numColors = 7;
 const juce::PixelARGB COLORS[numColors] = {
@@ -125,13 +67,13 @@ class Particle
         int tailLength = 0;
         float tail[20][2];
 
-        static constexpr int pixelate = 2;
+        static constexpr int pixelate = 4;
 
         inline void step(const float timestep) {
             for (size_t i = 0; i < 2; ++i) {
                 pos[i] += vel[i] * timestep;
             }
-            vel[1] += 0.05f;
+            vel[1] += 2.0f;
             // brightness *= decayFac * timestep;
         }
 
@@ -159,16 +101,15 @@ class Particle
                 const int centerY = static_cast<int>(p[1]);
 
                 // paint over the quantized canvas area
-                constexpr int shapeOffset = shapeSize/2;
+                constexpr int shapeOffset = Shapes::size/2;
                 const int startX = quantize(centerX - shapeOffset), 
                           startY = quantize(centerY - shapeOffset);
-                auto& shapeData = SHAPES[shape];
 
                 const bool shimmer = shimmerAmount > 0.02f && Random::next() < shimmerAmount;
 
                 // paint over the quantized canvas area in chunks with stride=pixelate
-                for (int y = startY; y < startY + shapeSize+pixelate-1; y += pixelate) {
-                    for (int x = startX; x < startX+shapeSize; x += pixelate) {
+                for (int y = startY; y < startY + Shapes::size+pixelate-1; y += pixelate) {
+                    for (int x = startX; x < startX+Shapes::size; x += pixelate) {
 
                         // within each chunk, count matching pixels within our shape
                         int sum = 0;
@@ -178,16 +119,16 @@ class Particle
                             int localY = y_ - centerY + shapeOffset;
                             if (localY < 0)
                                 continue;
-                            else if (localY >= shapeSize)
+                            else if (localY >= Shapes::size)
                                 break;
             
                             for (int x_ = x; x_ < x+pixelate; ++x_) {
                                 int localX = x_ - centerX + shapeOffset;
                                 if (localX < 0)
                                     continue;
-                                else if (localX >= shapeSize)
+                                else if (localX >= Shapes::size)
                                     break;
-                                sum += shapeData[localY][localX];
+                                sum += Shapes::get(shape, localY, localX);
                             }
                         }
 
@@ -197,7 +138,10 @@ class Particle
                         }
 
                         const float alpha = brightness * static_cast<float>(maxTail-i)/static_cast<float>(maxTail);
-                        const int alphaInt = static_cast<int>(256.0f * alpha);
+                        
+                        const bool pixelBlink = shimmer && Random::next() > 0.8f;
+                        const int alphaInt = pixelBlink ? 256 : static_cast<int>(256.0f * alpha);
+                        const juce::PixelARGB pixelColor = pixelBlink ? juce::PixelARGB(0xff, 0xff, 0xff, 0xff) : color; 
 
                         // apply the color
                         for (int y_ = y; y_ < y+pixelate; ++y_) {
@@ -212,12 +156,13 @@ class Particle
                                 if (x_ >= bmp.width)
                                     break;
 
+                                row[x_].blend(pixelColor, alphaInt);
 
-                                if (shimmer) {
-                                    row[x_].blend(juce::PixelARGB(0xff, 0xff, 0xff, 0xff), alphaInt);
-                                } else {
-                                    row[x_].blend(color, alphaInt);
-                                }
+                                // if (shimmer && Random::next() > 0.9f) {
+                                //     row[x_].blend(juce::PixelARGB(0xff, 0xff, 0xff, 0xff), alphaInt);
+                                // } else {
+                                //     row[x_].blend(color, alphaInt);
+                                // }
                             }
                         }
                     }
@@ -238,7 +183,7 @@ public:
     int dbg;
 
 private:
-    static constexpr float speed = 1.0f;
+    static constexpr float speed = 5.0f;
     const int frameRate;
     const float timestep;
 
@@ -262,7 +207,7 @@ private:
         return std::log2(frequency);
     }
     
-    static constexpr size_t maxRecentPitches = 20;
+    static constexpr size_t maxRecentPitches = 40;
     std::deque<float> recentPitches;
     inline void addRecentPitch(const float frequency) {
         recentPitches.push_back(frequencyToPitch(frequency));

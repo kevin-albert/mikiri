@@ -39,6 +39,8 @@ target_sources(Mikiri
         Source/PluginProcessor.h
         Source/PluginEditor.cpp
         Source/PluginEditor.h
+        Source/Shapes.cpp
+        Source/Shapes.h
         Source/Visualizer.h
         Source/Visualizer.cpp
 )

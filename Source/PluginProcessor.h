@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
+#include <cmath>
 #include <array>
 #include <vector>
 
@@ -22,6 +23,93 @@ public:
         float tone;
         float depth;
         int shape;
+    };
+
+    class Shifter 
+    {
+        public:
+            Shifter(int numOctaves):
+                stride(1<<numOctaves),
+                writeStep(stride - 1)
+            {}
+
+            void update(const double sampleRate, const double bpm, const double stepsPerBeat)
+            {
+                // set our buffer so that we loop (num strides) per arp step
+                stepLength = static_cast<int>((60.0 * sampleRate) / (bpm * stepsPerBeat) / stride);
+                if (stepLength > bufferSize - fadeSize)
+                    stepLength = bufferSize - fadeSize;
+                windowSize = stepLength + fadeSize;
+            }
+
+            void process(juce::AudioBuffer<float>& input, juce::AudioBuffer<float>& output, const float blur, const float mix)
+            {
+                const int numChannels = std::min(input.getNumChannels(), 2);
+                for (int i = 0; i < input.getNumSamples(); ++i) {
+                    if (++writeStep >= stride)
+                        writeStep = 0;
+
+                    // input filtering
+                    constexpr float alpha = 0.9f;
+                    for (int ch = 0; ch < numChannels; ++ch)
+                        writeState[ch] = writeState[ch] * (1.0f-alpha) + input.getReadPointer(ch)[i] * alpha;
+
+
+                    // write every <stride> sample to the buffer
+                    if (writeStep == 0) {
+                        for (int ch = 0; ch < numChannels; ++ch) {
+                            buffer[ch][writeIdx] = buffer[ch][writeIdx] * blur + writeState[ch] * (1.0f-blur);
+                        }
+                        if (++writeIdx >= bufferSize)
+                            writeIdx = 0;
+                    }
+
+                    if (mix > 0.01) {
+                        float fadeAmount = readOffset >= fadeSize ? 1.0f : static_cast<float>(readOffset)/static_cast<float>(fadeSize);
+                        int readIdx = (readStart+readOffset) %  bufferSize;
+                        for (int ch = 0; ch < numChannels; ++ch) {
+                            float out = buffer[ch][readIdx];
+                            if (fadeAmount < 0.99f)
+                                out = out * (fadeAmount) + buffer[ch][lastReadIdx] * (1.0f - fadeAmount);
+                            output.getWritePointer(ch)[i] = output.getWritePointer(ch)[i] * (1.0f-mix) + out * mix;
+                        }
+                    }
+
+                    if (++lastReadIdx >= bufferSize)
+                        lastReadIdx = 0;
+                    if (++readOffset >= stepLength) {
+                        lastReadIdx = readStart + readOffset;
+                        readStart = writeIdx - windowSize;
+                        if (readStart < 0)
+                            readStart += windowSize;
+                        readOffset = 0;
+                        xFade = 0.0f;
+                    }
+                }
+            }
+        
+        private:
+            int stride;
+            int writeStep; // value 0 to stride-1
+
+            static constexpr int bufferSize = 10000;
+            // buffer channel layout:
+            // [{xfade 0..fadeSize-1}{data fadeSize..fadeSize+bufferSize}...maxBufferSize]
+            float buffer[2][bufferSize] = {0.0f};
+    
+            static constexpr int fadeSize = 440;
+            int stepLength = 0;
+            int windowSize = fadeSize; // windowSize = stepLength + fadeSize
+            int writeIdx = 0;
+            int readStart = 0;
+            int readOffset = bufferSize - 1;
+            int lastReadIdx = bufferSize-fadeSize;
+            float xFade = 0.0f;
+
+            // filter input
+            float writeState[2] = {0.0f};
+
+
     };
 
     class Arpeggiator
@@ -263,6 +351,11 @@ private:
     juce::dsp::StateVariableTPTFilter<float> synthLowpass;
     juce::dsp::StateVariableTPTFilter<float> synthHighpass;
     juce::dsp::Phaser<float> synthPhaser;
+
+    juce::dsp::StateVariableTPTFilter<float> shiftHighpass;   
+    Shifter shift1{1};
+    Shifter shift2{2};
+    Shifter shift3{3};
 
     juce::dsp::StateVariableTPTFilter<float> crossoverLow;
     juce::dsp::StateVariableTPTFilter<float> crossoverHigh;

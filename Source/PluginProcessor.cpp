@@ -96,6 +96,9 @@ void PluginProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     spec.maximumBlockSize = static_cast<juce::uint32>(samplesPerBlock);
     spec.numChannels = 2;
 
+    shiftHighpass.prepare(spec);
+    shiftHighpass.setType(juce::dsp::StateVariableTPTFilterType::highpass);
+
     synthLowpass.prepare(spec);
     synthLowpass.setType(juce::dsp::StateVariableTPTFilterType::lowpass);
 
@@ -332,17 +335,47 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
             synthR[i] = applyClipping(synthR[i]);
     }
 
+    const float depth = depthParam->load();
+    const float half_pi = static_cast<float>(M_PI_2);
+    const float depthx3 = 3.0f * depth;
+    float shift1Amount = 0.0f;
+    float shift2Amount = 0.0f;
+    float shift3Amount = 0.0f;
+    if (depthx3 >= 2.0f)
+        shift1Amount = std::sin((depthx3-2.0f) * half_pi);
+    if (depthx3 >= 1.0f)
+        shift2Amount = std::sin((depthx3-1.0f) * half_pi);
+    if (depthx3 <= 1.5f)
+        shift3Amount = std::sin((depthx3+0.5f) * half_pi);
+
+    // pitch shifter
+    juce::AudioBuffer<float> shiftBuffer(numChannels, numSamples);
+    shiftBuffer.clear();
+
+    shift1.update(currentSampleRate, bpm, stepsPerBeat);
+    shift2.update(currentSampleRate, bpm, stepsPerBeat);
+    shift3.update(currentSampleRate, bpm, stepsPerBeat);
+
+    const float blur = blurParam->load();
+    const float feedback = 0.1f + blur*0.5f;
+    shift1.process(buffer, shiftBuffer, feedback, shift1Amount * envelope);
+    shift2.process(buffer, shiftBuffer, feedback, shift2Amount * envelope);
+    shift3.process(buffer, shiftBuffer, feedback, shift3Amount * envelope);
+
+    // combine shift + synth buffer before further processing
+    const float shiftMix = 0.03f + depth * 0.04f;
+    for (int ch = 0; ch < numChannels; ++ch)
+        synthBuffer.addFrom(ch, 0, shiftBuffer, ch, 0, numSamples, shiftMix);
+
     synthLowpass.setCutoffFrequency(toneValue);
     juce::dsp::AudioBlock<float> synthBlock(synthBuffer);
     juce::dsp::ProcessContextReplacing<float> synthContext(synthBlock);
     synthLowpass.process(synthContext);
 
-    synthHighpass.setCutoffFrequency(500.0f - 480.0f * depthParam->load());
+    synthHighpass.setCutoffFrequency(500.0f - 480.0f * depth);
     synthHighpass.process(synthContext);
 
     synthPhaser.process(synthContext);
-
-    const float blur = blurParam->load();
 
     juce::Reverb::Parameters lowRevParams;
     lowRevParams.roomSize = 0.3f + 0.3f * blur;

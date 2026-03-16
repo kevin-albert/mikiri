@@ -9,6 +9,7 @@ Visualizer::Visualizer(const int rate):
     timestep(speed / static_cast<float>(frameRate)),
     imageBuffer(juce::Image::ARGB, 680, 300, true)
 {
+    Shapes::init();
 }
 
 void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
@@ -55,10 +56,9 @@ void Visualizer::step(const std::vector<PluginProcessor::VizStep>& steps)
                 float y = yMin + yFactor * (yMax-yMin);
                 float x = 150.0f;
                 const float shimmerAmount = 0.3f * step.tone / 16000.0f;
-                const int tailLength = static_cast<int>(2.0f + 12.0f * step.blur);
+                const int tailLength = static_cast<int>(2.0f + 6.0f * step.blur);
 
-                const float brightness = std::min(0.5f + 1.0f * tone.magnitude, 1.0f);
-                Particle* p = new Particle(COLORS[colorId], step.shape, brightness, 0.9f, shimmerAmount, tailLength);
+                Particle* p = new Particle(COLORS[colorId], step.shape, 1.0f, 0.9f, shimmerAmount, tailLength);
                 p->pos[0] = x;
                 p->pos[1] = y;
                 p->vel[0] = Random::next(100.0f, + 300.0f * static_cast<float>(step.envelope));
