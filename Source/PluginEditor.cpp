@@ -88,6 +88,14 @@ PluginEditor::PluginEditor(PluginProcessor& processor)
 
     bgImage = juce::ImageCache::getFromMemory(BinaryData::uibg_png, BinaryData::uibg_pngSize);
 
+    rateImages[0] = juce::ImageCache::getFromMemory(BinaryData::_16th_png, BinaryData::_16th_pngSize);
+    rateImages[1] = juce::ImageCache::getFromMemory(BinaryData::_16thtriplet_png, BinaryData::_16thtriplet_pngSize);
+    rateImages[2] = juce::ImageCache::getFromMemory(BinaryData::dotted32nd_png, BinaryData::dotted32nd_pngSize);
+    rateImages[3] = juce::ImageCache::getFromMemory(BinaryData::_32nd_png, BinaryData::_32nd_pngSize);
+    rateImages[4] = juce::ImageCache::getFromMemory(BinaryData::_32ndtriplet_png, BinaryData::_32ndtriplet_pngSize);
+    rateImages[5] = juce::ImageCache::getFromMemory(BinaryData::dotted64th_png, BinaryData::dotted64th_pngSize);
+    rateImages[6] = juce::ImageCache::getFromMemory(BinaryData::_64th_png, BinaryData::_64th_pngSize);
+
     fgOverlay.setImage(juce::ImageCache::getFromMemory(BinaryData::uifg_png, BinaryData::uifg_pngSize));
     fgOverlay.setInterceptsMouseClicks(false, false);
     addAndMakeVisible(fgOverlay);
@@ -113,6 +121,22 @@ void PluginEditor::paint(juce::Graphics& g)
     if (bgImage.isValid())
         g.drawImage(bgImage, getLocalBounds().toFloat());
 
+    if (currentRateImage.isValid())
+    {
+        float opacity = 0.5f + 0.5f * std::sin(rateImagePhase);
+        auto rateBounds = rateSlider.getBounds();
+        int imgSize = rateBounds.getWidth();
+        auto centre = rateBounds.getCentre();
+        g.setOpacity(opacity);
+        g.drawImage(currentRateImage,
+                    juce::Rectangle<float>(
+                        static_cast<float>(centre.getX()) - imgSize * 0.5f,
+                        static_cast<float>(centre.getY()) - imgSize * 0.5f,
+                        static_cast<float>(imgSize),
+                        static_cast<float>(imgSize)));
+        g.setOpacity(1.0f);
+    }
+
     auto vizBuffer = viz.getBuffer();
     if (vizBuffer.isValid())
         g.drawImageAt(vizBuffer, 0, 0);
@@ -121,7 +145,7 @@ void PluginEditor::paint(juce::Graphics& g)
 void PluginEditor::resized()
 {
     constexpr int knobSize = 30;
-    constexpr int rateKnobSize = 75;
+    constexpr int rateKnobSize = 76;
     constexpr int gap = 20;
     constexpr int numSmall = 6;
     constexpr int totalWidth = knobSize * numSmall + rateKnobSize + gap * 6;
@@ -155,6 +179,19 @@ void PluginEditor::resized()
 
 void PluginEditor::timerCallback()
 {
+    int rateIndex = static_cast<int>(processorRef.getParameters().getParameterAsValue("rate").getValue());
+    if (rateIndex != lastRateIndex)
+    {
+        lastRateIndex = rateIndex;
+        if (rateIndex >= 0 && rateIndex < static_cast<int>(rateImages.size()))
+            currentRateImage = rateImages[static_cast<size_t>(rateIndex)];
+    }
+
+    float stepsPerSecond = processorRef.getStepsPerSecond();
+    constexpr float twoPi = juce::MathConstants<float>::twoPi;
+    rateImagePhase += twoPi * stepsPerSecond / static_cast<float>(refreshRate) / 2.0f;
+    rateImagePhase = std::fmod(rateImagePhase, twoPi);
+
     processorRef.getVizSteps(steps);
     viz.step(steps);
     debugLabel.setText(juce::String(viz.dbg), juce::dontSendNotification);

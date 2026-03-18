@@ -29,9 +29,10 @@ public:
     class Shifter 
     {
         public:
-            Shifter(int numOctaves):
+            Shifter(int numOctaves, float startPhase):
                 stride(1<<numOctaves),
-                writeStep(stride - 1)
+                writeStep(stride - 1),
+                phase(startPhase)
             {}
 
             void update(const double sampleRate, const double bpm, const double stepsPerBeat)
@@ -41,6 +42,9 @@ public:
                 if (stepLength > bufferSize - fadeSize)
                     stepLength = bufferSize - fadeSize;
                 windowSize = stepLength + fadeSize;
+
+                // modulate volume based on phase
+                phaseIncr = static_cast<float>(bpm / 60.0 / sampleRate) * juce::MathConstants<float>::twoPi;
             }
 
             void process(juce::AudioBuffer<float>& input, juce::AudioBuffer<float>& output, const float blur, const float mix)
@@ -65,14 +69,15 @@ public:
                             writeIdx = 0;
                     }
 
-                    if (mix > 0.01) {
+                    float volume = 0.5f + 0.5f * std::sin(phase);
+                    if (mix > 0.001) {
                         float fadeAmount = readOffset >= fadeSize ? 1.0f : static_cast<float>(readOffset)/static_cast<float>(fadeSize);
                         int readIdx = (readStart+readOffset) %  bufferSize;
                         for (int ch = 0; ch < numChannels; ++ch) {
                             float out = buffer[ch][readIdx];
                             if (fadeAmount < 0.99f)
                                 out = out * (fadeAmount) + buffer[ch][lastReadIdx] * (1.0f - fadeAmount);
-                            output.getWritePointer(ch)[i] = output.getWritePointer(ch)[i] * (1.0f-mix) + out * mix;
+                            output.getWritePointer(ch)[i] = output.getWritePointer(ch)[i] * (1.0f-mix) + out * mix * volume;
                         }
                     }
 
@@ -86,6 +91,8 @@ public:
                         readOffset = 0;
                         xFade = 0.0f;
                     }
+
+                    phase = std::fmod(phase+phaseIncr, juce::MathConstants<float>::twoPi);
                 }
             }
         
@@ -106,6 +113,9 @@ public:
             int readOffset = bufferSize - 1;
             int lastReadIdx = bufferSize-fadeSize;
             float xFade = 0.0f;
+
+            float phase;
+            float phaseIncr = 0.0f;
 
             // filter input
             float writeState[2] = {0.0f};
@@ -353,10 +363,11 @@ private:
     juce::dsp::StateVariableTPTFilter<float> synthHighpass;
     juce::dsp::Phaser<float> synthPhaser;
 
+    float shiftPhase = 0.0f;
     juce::dsp::StateVariableTPTFilter<float> shiftHighpass;   
-    Shifter shift1{1};
-    Shifter shift2{2};
-    Shifter shift3{3};
+    Shifter shift1{1, 0.0f};
+    Shifter shift2{2, juce::MathConstants<float>::twoPi*1.0f/3.0f};
+    Shifter shift3{3, juce::MathConstants<float>::twoPi*2.0f/3.0f};
 
     juce::dsp::StateVariableTPTFilter<float> crossoverLow;
     juce::dsp::StateVariableTPTFilter<float> crossoverHigh;
@@ -396,8 +407,11 @@ private:
     std::deque<VizStep> vizSteps;
     juce::SpinLock vizLock;
 
+    std::atomic<float> currentStepsPerSecond { 0.0f };
+
 public:
     float getEnvelope() const { return envelope; }
+    float getStepsPerSecond() const { return currentStepsPerSecond.load(); }
 
     std::vector<float> getDetectedFrequencies() const
     {

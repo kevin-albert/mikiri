@@ -100,6 +100,11 @@ private:
     juce::Image vizBuffer;
     ForegroundOverlay fgOverlay;
 
+    std::array<juce::Image, 7> rateImages;
+    int lastRateIndex = -1;
+    juce::Image currentRateImage;
+    float rateImagePhase = 0.0f;
+
     static constexpr int refreshRate = 20;
 
     std::vector<PluginProcessor::VizStep> steps;

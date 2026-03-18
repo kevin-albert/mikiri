@@ -196,6 +196,7 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
     }
 
     double stepsPerBeat = rateMultipliers[rateIdx];
+    currentStepsPerSecond.store(static_cast<float>((bpm * stepsPerBeat) / 60.0));
     arp1.syncToHost(ppqPosition, stepsPerBeat, numPitches, isPlaying);
     arp2.syncToHost(ppqPosition, stepsPerBeat, numPitches, isPlaying);
 
@@ -338,15 +339,15 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     const float depth = depthParam->load();
     const float depthx3 = 3.0f * depth;
-    float shift1Amount = 0.0f;
-    float shift2Amount = 0.0f;
-    float shift3Amount = 0.0f;
+    float shift1Amount = 0.3f;
+    float shift2Amount = 0.3f;
+    float shift3Amount = 0.3f;
     if (depthx3 >= 2.0f)
-        shift1Amount = std::sin((depthx3-2.0f) * juce::MathConstants<float>::halfPi);
+        shift1Amount += 0.2f*std::sin((depthx3-2.0f) * juce::MathConstants<float>::halfPi);
     if (depthx3 >= 1.0f)
-        shift2Amount = std::sin((depthx3-1.0f) * juce::MathConstants<float>::halfPi);
+        shift2Amount += 0.2f*std::sin((depthx3-1.0f) * juce::MathConstants<float>::halfPi);
     if (depthx3 <= 1.5f)
-        shift3Amount = std::sin((depthx3+0.5f) * juce::MathConstants<float>::halfPi);
+        shift3Amount += 0.2f*std::sin((depthx3+0.5f) * juce::MathConstants<float>::halfPi);
 
     // pitch shifter
     juce::AudioBuffer<float> shiftBuffer(numChannels, numSamples);
@@ -358,9 +359,9 @@ void PluginProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
     const float blur = blurParam->load();
     const float feedback = 0.1f + blur*0.5f;
-    shift1.process(buffer, shiftBuffer, feedback, shift1Amount * envelope);
-    shift2.process(buffer, shiftBuffer, feedback, shift2Amount * envelope);
-    shift3.process(buffer, shiftBuffer, feedback, shift3Amount * envelope);
+    shift1.process(buffer, shiftBuffer, feedback, shift1Amount);
+    shift2.process(buffer, shiftBuffer, feedback, shift2Amount);
+    shift3.process(buffer, shiftBuffer, feedback, shift3Amount);
 
     // combine shift + synth buffer before further processing
     const float shiftMix = 0.02f + depth * 0.03f;

@@ -31,6 +31,13 @@ juce_add_binary_data(MikiriAssets
     SOURCES
         Assets/ui-bg.png
         Assets/ui-fg.png
+        Assets/16th.png
+        Assets/16th-triplet.png
+        Assets/dotted-32nd.png
+        Assets/32nd.png
+        Assets/32nd-triplet.png
+        Assets/dotted-64th.png
+        Assets/64th.png
 )
 
 target_sources(Mikiri
